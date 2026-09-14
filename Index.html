@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hudson Canyon Live Beaufort Monitor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0c1013;
+            color: #e0e6ed;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .weather-card {
+            max-width: 550px;
+            width: 100%;
+            background: #141d26;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            text-align: center;
+            border: 1px solid #243342;
+        }
+        h2 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 1.6em;
+            letter-spacing: 0.5px;
+        }
+        .wind-speed-badge {
+            display: inline-block;
+            background: #1e2d3b;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #70b5ff;
+            margin-bottom: 15px;
+        }
+        .status-tag {
+            font-size: 1.8em;
+            font-weight: 800;
+            margin: 15px 0 5px 0;
+            transition: color 0.3s ease;
+        }
+        .graphic-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+            background: #000;
+            aspect-ratio: 4 / 3;
+        }
+        .forecast-text {
+            font-size: 0.95em;
+            color: #8899a6;
+            line-height: 1.5;
+            background: #192431;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+            border-left: 4px solid #1da1f2;
+        }
+    </style>
+</head>
+<body>
+
+<div class="weather-card">
+    <h2>Hudson Canyon 1000 FM</h2>
+    <div class="wind-speed-badge" id="raw-wind">Reading NOAA Data...</div>
+    
+    <div class="status-tag" id="beaufort-status">Force --</div>
+    <div style="font-size: 0.9em; color:#a0a0a0;" id="beaufort-desc">Determining sea state...</div>
+    
+    <!-- Dynamic SVG Target Container -->
+    <div class="graphic-container" id="svg-container"></div>
+    
+    <div class="forecast-text" id="forecast-text">Fetching latest offshore text forecast...</div>
+</div>
+
+<script>
+    const apiURL = "https://weather.gov";
+
+    function getBeaufortForce(knots) {
+        if (knots <= 1) return 0;
+        if (knots <= 3) return 1;
+        if (knots <= 6) return 2;
+        if (knots <= 10) return 3;
+        if (knots <= 16) return 4;
+        if (knots <= 21) return 5;
+        if (knots <= 27) return 6;
+        if (knots <= 33) return 7;
+        if (knots <= 40) return 8;
+        if (knots <= 47) return 9;
+        if (knots <= 55) return 10;
+        if (knots <= 63) return 11;
+        return 12;
+    }
+
+    const beaufortMeta = {
+        0: { name: "Calm", desc: "Sea like a mirror.", sky: "#1b263b", water: "#0d1b2a", dynamicColor: "#5c7aff", waveAmp: 0, foam: false },
+        1: { name: "Light Air", desc: "Ripples with appearance of scales.", sky: "#1a2536", water: "#0b1829", dynamicColor: "#4cc9f0", waveAmp: 2, foam: false },
+        2: { name: "Light Breeze", desc: "Small wavelets; crests do not break.", sky: "#182230", water: "#0a1626", dynamicColor: "#4895ef", waveAmp: 4, foam: false },
+        3: { name: "Gentle Breeze", desc: "Large wavelets; crests begin to break.", sky: "#161f2b", water: "#091322", dynamicColor: "#4361ee", waveAmp: 7, foam: false },
+        4: { name: "Moderate Breeze", desc: "Small waves becoming longer; fairly frequent white horses.", sky: "#212529", water: "#0b1520", dynamicColor: "#3f37c9", waveAmp: 12, foam: true },
+        5: { name: "Fresh Breeze", desc: "Moderate waves; many white horses.", sky: "#2b2d42", water: "#0f1a24", dynamicColor: "#3a0ca3", waveAmp: 18, foam: true },
+        6: { name: "Strong Breeze", desc: "Large waves begin to form; white foam crests are more extensive.", sky: "#343a40", water: "#111d28", dynamicColor: "#7209b7", waveAmp: 25, foam: true },
+        7: { name: "Near Gale", desc: "Sea heaps up; white foam from breaking waves blows in streaks.", sky: "#495057", water: "#132230", dynamicColor: "#f72585", waveAmp: 32, foam: true },
+        8: { name: "Gale", desc: "Moderately high waves; crests break into spindrift.", sky: "#403d39", water: "#182836", dynamicColor: "#ff4d6d", waveAmp: 40, foam: true },
+        9: { name: "Strong Gale", desc: "High waves; dense streaks of foam; wave crests topple and roll.", sky: "#2b2b2b", water: "#172b3c", dynamicColor: "#ff7b00", waveAmp: 48, foam: true },
+        10: { name: "Storm", desc: "Very high waves with long overhanging crests; sea looks white.", sky: "#1c1c1c", water: "#162e44", dynamicColor: "#ffb703", waveAmp: 55, foam: true },
+        11: { name: "Violent Storm", desc: "Exceptionally high waves; sea covered with white foam patches.", sky: "#111", water: "#14334e", dynamicColor: "#ff0000", waveAmp: 62, foam: true },
+        12: { name: "Hurricane Force", desc: "Air filled with foam and spray; sea completely white; driving spray.", sky: "#050505", water: "#10395c", dynamicColor: "#d90429", waveAmp: 72, foam: true }
+    };
+
+    // This function generates the SVG template dynamically based on Beaufort specs
+    function generateSeaStateSVG(force) {
+        const config = beaufortMeta[force];
+        const amp = config.waveAmp;
+        
+        // Define paths for two layers of waves using sine-wave approximations
+        let wavePathBehind = `M 0 220 Q 100 ${220 - amp * 0.7} 200 220 T 400 220 L 400 300 L 0 300 Z`;
+        let wavePathFront  = `M 0 240 Q 80  ${240 - amp}       160 240 T 320 240 T 400 240 L 400 300 L 0 300 Z`;
+        
+        // Add extreme jagged peaks for severe storm warnings (Force 8+)
+        if (force >= 8) {
+            wavePathFront = `M 0 240 L 50 ${240 - amp} L 100 245 L 170 ${230 - amp} L 240 250 L 310 ${235 - amp} L 400 240 L 400 300 L 0 300 Z`;
+        }
+
+        // Conditionally generate foam lines
+        let foamElements = '';
+        if (config.foam) {
+            const opacity = Math.min(0.2 + (force * 0.06), 0.9);
+            foamElements = `
+                <path d="M 10 ${230 - amp*0.3} Q 90 ${220 - amp*0.5} 150 ${235 - amp*0.2}" stroke="#ffffff" stroke-width="${Math.min(2 + force, 8)}" fill="none" opacity="${opacity}" stroke-dasharray="10 15"/>
+                <path d="M 120 ${245 - amp*0.6} Q 220 ${230 - amp*0.8} 340 ${240 - amp*0.4}" stroke="#ffffff" stroke-width="${Math.min(3 + force, 10)}" fill="none" opacity="${opacity}" stroke-dasharray="30 10 10 20"/>
+            `;
+        }
+
+        // Dynamically add wind lines crossing the sky depending on severity
+        let windLines = '';
+        const windCount = Math.min(force, 8); 
+        for (let i = 0; i < windCount; i++) {
+            let yPos = 40 + (i * 20);
+            let length = 40 + (force * 15);
+            let xPos = 30 + (i * 25);
+            windLines += `<line x1="${xPos}" y1="${yPos}" x2="${xPos + length}" y2="${yPos}" stroke="#ffffff" stroke-width="${Math.max(1, force/3)}" opacity="${0.1 + (force/20)}" />`;
+        }
+
+        // Return the full integrated inline SVG string
+        return `
+            <svg viewBox="0 0 400 300" width="100%" height="100%" xmlns="http://w3.org">
+                <!-- Sky/Background -->
+                <rect width="400" height="300" fill="${config.sky}" />
+                
+                <!-- Wind Lines -->
+                ${windLines}
+                
+                <!-- Distant Wave Layer -->
+                <path d="${wavePathBehind}" fill="${config.water}" opacity="0.6"/>
+                
+                <!-- Foreground Wave Layer -->
+                <path d="${wavePathFront}" fill="${config.water}"/>
+                
+                <!-- Breaking Crests/Foam/Spindrift -->
+                ${foamElements}
+            </svg>
+        `;
+    }
+
+    async function updateBeaufortDisplay() {
+        try {
+            const response = await fetch(apiURL, {
+                headers: { 'User-Agent': 'MarineBeaufortApp (contact@example.com)' }
+            });
+            if (!response.ok) throw new Error("API call failed");
+            
+            const data = await response.json();
+            const currentForecastText = data.properties.periods[0].detailedForecast;
+            document.getElementById('forecast-text').innerText = currentForecastText;
+
+            // Extract numbers preceding "kt" to determine velocity
+            const knotMatch = currentForecastText.match(/(\d+)\s*to\s*(\d+)\s*kt/i) || currentForecastText.match(/(\d+)\s*kt/i);
+            
+            let maxKnots = 0;
+            if (knotMatch) {
+                // Grab the higher digit value inside a range description
+                maxKnots = knotMatch[2] ? parseInt(knotMatch[2]) : parseInt(knotMatch[1]);
+                document.getElementById('raw-wind').innerText = `Live Wind Window: ${maxKnots} Knots Max`;
+            } else {
+                document.getElementById('raw-wind').innerText = "Wind: Light / Variable";
+            }
+
+            const force = getBeaufortForce(maxKnots);
+            const condition = beaufortMeta[force];
+
+            // Render status texts
+            const statusTag = document.getElementById('beaufort-status');
+            statusTag.innerText = `Force ${force}: ${condition.name}`;
+            statusTag.style.color = condition.dynamicColor;
+            document.getElementById('beaufort-desc').innerText = condition.desc;
+
+            // Generate and inject the custom inline SVG vector graphic
