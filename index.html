@@ -65,6 +65,16 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        .debug-error {
+            color: #ef4444;
+            font-family: monospace;
+            background: #451a1a;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-top: 15px;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -101,6 +111,7 @@
     </div>
     
     <div id="status-message" class="loading">Connecting to National Data Buoy Center...</div>
+    <div id="debug-box" style="display: none;"></div>
 </div>
 
 <script>
@@ -108,20 +119,23 @@
     const STATION_ID = '44065'; 
     
     async function fetchBuoyData() {
+        const statusElement = document.getElementById('status-message');
+        const debugBox = document.getElementById('debug-box');
+        
         const rawUrl = `https://noaa.gov{STATION_ID}.txt`;
         const proxyUrl = `https://allorigins.win{encodeURIComponent(rawUrl)}`;
 
         try {
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Could not fetch buoy file.");
+            if (!response.ok) throw new Error(`HTTP network error! Status: ${response.status}`);
+            
             const text = await response.text();
 
-            // Split raw file into individual structural rows
+            // Split raw text data into individual clean string lines
             const lines = text.trim().split('\n');
-            if (lines.length < 3) throw new Error("Empty data matrix returned.");
+            if (lines.length < 3) throw new Error("Empty or truncated data matrix returned from NDBC.");
 
-            // Extract structural metrics from fixed positions 
-            // Line 0 contains metrics names, Line 2 contains latest metric records
+            // FIX: Explicitly target array row positions (0 for keys, 2 for absolute latest metrics)
             const headers = lines[0].trim().split(/\s+/);
             const latestRow = lines[2].trim().split(/\s+/);
 
@@ -132,28 +146,33 @@
             });
 
             // Unit conversions from metric to marine standard imperial
-            document.getElementById('wave-height').innerText = data.WVHT !== 'MM' ? `${(parseFloat(data.WVHT) * 3.28084).toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-period').innerText = data.DPD !== 'MM' ? `${data.DPD} sec` : 'N/A';
+            document.getElementById('wave-height').innerText = data.WVHT && data.WVHT !== 'MM' ? `${(parseFloat(data.WVHT) * 3.28084).toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-period').innerText = data.DPD && data.DPD !== 'MM' ? `${data.DPD} sec` : 'N/A';
             
-            const windSpeedKts = data.WSPD !== 'MM' ? (parseFloat(data.WSPD) * 1.94384).toFixed(1) : 'N/A';
-            const windGustKts = data.GST !== 'MM' ? (parseFloat(data.GST) * 1.94384).toFixed(1) : 'N/A';
+            const windSpeedKts = data.WSPD && data.WSPD !== 'MM' ? (parseFloat(data.WSPD) * 1.94384).toFixed(1) : 'N/A';
+            const windGustKts = data.GST && data.GST !== 'MM' ? (parseFloat(data.GST) * 1.94384).toFixed(1) : 'N/A';
             document.getElementById('wind-speed').innerText = `${windSpeedKts} / ${windGustKts} kts`;
             
-            document.getElementById('wind-dir').innerText = data.WDIR !== 'MM' ? `${data.WDIR}°` : 'N/A';
-            document.getElementById('water-temp').innerText = data.WTMP !== 'MM' ? `${((parseFloat(data.WTMP) * 9/5) + 32).toFixed(1)} °F` : 'N/A';
-            document.getElementById('pressure').innerText = data.BAR !== 'MM' ? `${data.BAR} hPa` : 'N/A';
+            document.getElementById('wind-dir').innerText = data.WDIR && data.WDIR !== 'MM' ? `${data.WDIR}°` : 'N/A';
+            document.getElementById('water-temp').innerText = data.WTMP && data.WTMP !== 'MM' ? `${((parseFloat(data.WTMP) * 9/5) + 32).toFixed(1)} °F` : 'N/A';
+            document.getElementById('pressure').innerText = data.BAR && data.BAR !== 'MM' ? `${data.BAR} hPa` : 'N/A';
 
             // Print the timestamp tracking exactly when the data payload was measured
             document.getElementById('station-meta').innerText = `Latest Reading: ${data['#YY']}-${data.MM}-${data.DD} @ ${data.hh}:${data.mm} UTC`;
             
             // Toggle visibility to render dashboard cards
-            document.getElementById('status-message').style.display = 'none';
+            statusElement.style.display = 'none';
             document.getElementById('data-grid').style.display = 'grid';
 
         } catch (error) {
-            document.getElementById('status-message').innerText = `Error processing live matrix stream from Buoy ${STATION_ID}.`;
-            document.getElementById('status-message').className = '';
-            document.getElementById('status-message').style.color = '#ef4444';
+            statusElement.innerText = `Error parsing live matrix stream from Buoy ${STATION_ID}.`;
+            statusElement.className = '';
+            statusElement.style.color = '#ef4444';
+            
+            // Display exact code error info below so we can see exactly what failed
+            debugBox.className = 'debug-error';
+            debugBox.style.display = 'block';
+            debugBox.innerText = `Technical Details: ${error.message}`;
             console.error(error);
         }
     }
