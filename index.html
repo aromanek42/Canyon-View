@@ -177,9 +177,10 @@
 
     async function updateBeaufortDisplay() {
         try {
-            const response = await fetch(apiURL, {
-                headers: { 'User-Agent': 'MarineBeaufortApp (contact@example.com)' }
-            });
+          const response = await fetch(apiURL, {
+    headers: { 'User-Agent': 'HudsonCanyonWeatherMonitor (aromanek86@gmail.com)' }
+});
+
             if (!response.ok) throw new Error("API call failed");
             
             const data = await response.json();
