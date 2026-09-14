@@ -3,157 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hudson Canyon 1000 FM Live Telemetry</title>
+    <title>Hudson Canyon Marine Weather</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #0b1329;
-            color: #f8fafc;
-            margin: 0;
-            padding: 20px;
-        }
-        .dashboard {
-            max-width: 600px;
-            margin: 40px auto;
-            background: #1c2541;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            border: 1px solid #3b82f633;
-        }
-        h1 {
-            font-size: 1.6rem;
-            margin-top: 0;
-            color: #38bdf8;
-            border-bottom: 1px solid #3b82f633;
-            padding-bottom: 10px;
-        }
-        .meta {
-            font-size: 0.85rem;
-            color: #94a3b8;
-            margin-bottom: 20px;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-        .card {
-            background: #0b1329;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #1e293b;
-        }
-        .card-label {
-            font-size: 0.8rem;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .card-value {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #f1f5f9;
-            margin-top: 5px;
-        }
-        .loading {
-            color: #38bdf8;
-            font-weight: bold;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f7f9; color: #222; padding: 20px; }
+        .card { max-width: 750px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e1e8ed; }
+        .header { background: #004b87; color: white; padding: 20px; }
+        .header h1 { margin: 0; font-size: 20px; }
+        .header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.8; }
+        .content { padding: 25px; }
+        .period { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed #e1e8ed; }
+        .period:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+        .period-name { font-weight: 700; color: #004b87; text-transform: uppercase; font-size: 14px; margin-bottom: 4px; }
+        .period-text { font-size: 15px; line-height: 1.6; }
+        .loading { text-align: center; color: #666; padding: 40px; font-style: italic; }
+        .error { color: #d9534f; padding: 25px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="dashboard">
-    <h1>Hudson Canyon (1000 FM)</h1>
-    <div class="meta" id="station-meta">Coordinates: 39.55°N, 72.41°W | Model: NOAA GFS Wave</div>
-
-    <div id="data-grid" class="grid" style="display:none;">
-        <div class="card">
-            <div class="card-label">Significant Wave Height</div>
-            <div id="wave-height" class="card-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-label">Dominant Wave Period</div>
-            <div id="wave-period" class="card-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-label">Swell Wave Height</div>
-            <div id="swell-height" class="card-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-label">Swell Direction</div>
-            <div id="swell-dir" class="card-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-label">Wind Wave Height</div>
-            <div id="wind-wave" class="card-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-label">Wave Direction</div>
-            <div id="wave-dir" class="card-value">--</div>
-        </div>
+<div class="card">
+    <div class="header">
+        <h1>Hudson Canyon to 1000 FM</h1>
+        <p id="update-time">Loading live NOAA offshore forecast...</p>
     </div>
-    
-    <div id="status-message" class="loading">Connecting directly to NOAA GFS Marine Grid...</div>
+    <div class="content" id="forecast-container">
+        <div class="loading">Connecting to api.weather.gov...</div>
+    </div>
 </div>
 
-<script>
-    async function fetchCanyonData() {
-        const statusElement = document.getElementById('status-message');
-        
-        // Target deep sea coordinates for the Hudson Canyon drop
-        const lat = 39.5518;
-        const lon = -72.4075;
-        
-        // Built with clean parameters: uses 'current' selection and targets global offshore grids explicitly
-        const apiUrl = `https://open-meteo.com{lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_direction,wind_wave_height&length_unit=imperial&models=ncep_gfswave016`;
-
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error("API failed to respond.");
-            
-            const json = await response.json();
-            
-            if (!json.current) throw new Error("No real-time data returned for these coordinates.");
-
-            // Direct object values from the global deep-sea wave grid response
-            const waveHeight = json.current.wave_height;
-            const wavePeriod = json.current.wave_period;
-            const waveDir = json.current.wave_direction;
-            const swellHeight = json.current.swell_wave_height;
-            const swellDir = json.current.swell_wave_direction;
-            const windWave = json.current.wind_wave_height;
-
-            // Render conditions safely
-            document.getElementById('wave-height').innerText = typeof waveHeight === 'number' ? `${waveHeight.toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-period').innerText = typeof wavePeriod === 'number' ? `${wavePeriod.toFixed(0)} sec` : 'N/A';
-            document.getElementById('swell-height').innerText = typeof swellHeight === 'number' ? `${swellHeight.toFixed(1)} ft` : 'N/A';
-            document.getElementById('swell-dir').innerText = typeof swellDir === 'number' ? `${swellDir}°` : 'N/A';
-            document.getElementById('wind-wave').innerText = typeof windWave === 'number' ? `${windWave.toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-dir').innerText = typeof waveDir === 'number' ? `${waveDir}°` : 'N/A';
-
-            // Timestamp parsing
-            const formattedTime = new Date(json.current.time + 'Z').toLocaleString();
-            document.getElementById('station-meta').innerText = `Updated: ${formattedTime} | Coordinates: 39.55°N, 72.41°W`;
-
-            // Display grid cards
-            statusElement.style.display = 'none';
-            document.getElementById('data-grid').style.display = 'grid';
-
-        } catch (error) {
-            statusElement.innerText = `Error: ${error.message}`;
-            statusElement.style.color = '#ef4444';
-            console.error(error);
-        }
-    }
-
-    fetchCanyonData();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
