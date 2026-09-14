@@ -70,7 +70,7 @@
 <body>
 
 <div class="dashboard">
-    <h1 id="station-title">Buoy 44025 Live Conditions</h1>
+    <h1 id="station-title">Buoy 44065 Live Conditions</h1>
     <div class="meta" id="station-meta">Loading latest NDBC transmission...</div>
 
     <div id="data-grid" class="grid" style="display:none;">
@@ -104,9 +104,8 @@
 </div>
 
 <script>
-    // Using Station 44025 because 44066 is currently recovered/offline.
-    // Simply change this ID to test other active locations.
-    const STATION_ID = '44025'; 
+    // Station 44065 is active and operational near NY Harbor entrance/shelf edge
+    const STATION_ID = '44065'; 
     
     async function fetchBuoyData() {
         const rawUrl = `https://noaa.gov{STATION_ID}.txt`;
@@ -117,21 +116,22 @@
             if (!response.ok) throw new Error("Could not fetch buoy file.");
             const text = await response.text();
 
-            // Split file into individual lines
+            // Split raw file into individual structural rows
             const lines = text.trim().split('\n');
             if (lines.length < 3) throw new Error("Empty data matrix returned.");
 
-            // Line 0 = Column headers, Line 1 = Units, Line 2 = Absolute latest data row
+            // Extract structural metrics from fixed positions 
+            // Line 0 contains metrics names, Line 2 contains latest metric records
             const headers = lines[0].trim().split(/\s+/);
             const latestRow = lines[2].trim().split(/\s+/);
 
-            // Map columns to values dynamically
+            // Assemble header array matching values explicitly
             const data = {};
             headers.forEach((header, index) => {
                 data[header] = latestRow[index];
             });
 
-            // Convert and populate UI values (checking for missing "MM" tokens)
+            // Unit conversions from metric to marine standard imperial
             document.getElementById('wave-height').innerText = data.WVHT !== 'MM' ? `${(parseFloat(data.WVHT) * 3.28084).toFixed(1)} ft` : 'N/A';
             document.getElementById('wave-period').innerText = data.DPD !== 'MM' ? `${data.DPD} sec` : 'N/A';
             
@@ -143,15 +143,15 @@
             document.getElementById('water-temp').innerText = data.WTMP !== 'MM' ? `${((parseFloat(data.WTMP) * 9/5) + 32).toFixed(1)} °F` : 'N/A';
             document.getElementById('pressure').innerText = data.BAR !== 'MM' ? `${data.BAR} hPa` : 'N/A';
 
-            // Update timestamp
+            // Print the timestamp tracking exactly when the data payload was measured
             document.getElementById('station-meta').innerText = `Latest Reading: ${data['#YY']}-${data.MM}-${data.DD} @ ${data.hh}:${data.mm} UTC`;
             
-            // Toggle visibility
+            // Toggle visibility to render dashboard cards
             document.getElementById('status-message').style.display = 'none';
             document.getElementById('data-grid').style.display = 'grid';
 
         } catch (error) {
-            document.getElementById('status-message').innerText = `Error: Unable to process data from Buoy ${STATION_ID}. It may be undergoing maintenance.`;
+            document.getElementById('status-message').innerText = `Error processing live matrix stream from Buoy ${STATION_ID}.`;
             document.getElementById('status-message').className = '';
             document.getElementById('status-message').style.color = '#ef4444';
             console.error(error);
