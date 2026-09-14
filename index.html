@@ -68,7 +68,7 @@
 
 <div class="container">
     <h1>Hudson Canyon to Baltimore Canyon to 1000 FM</h1>
-    <div class="meta-info">Zone ID: ANZ820 | Data Source: National Weather Service</div>
+    <div class="meta-info">Zone ID: ANZ820 | Data Source: NWS API</div>
     
     <button class="refresh-btn" onclick="fetchMarineForecast()">Refresh Forecast</button>
     
@@ -80,29 +80,43 @@
 <script>
     async function fetchMarineForecast() {
         const container = document.getElementById('forecast-container');
-        container.innerHTML = '<p class="loading">Updating live text...</p>';
+        container.innerHTML = '<p class="loading">Connecting directly to NOAA API...</p>';
         
-        // Target the official NWS marine text product endpoint
-        const targetUrl = 'https://noaa.gov';
-        // Utilizing a public CORS proxy to allow browser-side fetching
-        const proxyUrl = 'https://allorigins.win' + encodeURIComponent(targetUrl);
+        // Direct, proxy-free official NOAA API endpoint for marine zone ANZ820
+        const apiUrl = 'https://weather.gov';
 
         try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Network response failed');
+            // NOAA API requires a unique User-Agent identifier to handle API volume
+            const response = await fetch(apiUrl, {
+                headers: {
+                    'User-Agent': 'MyHudsonCanyonWeatherPage/1.0 (contact@example.com)'
+                }
+            });
             
-            const textData = await response.text();
+            if (!response.ok) throw new Error('NOAA API returned an error status.');
             
-            // Render the raw formatted text report directly from NOAA
-            container.innerHTML = `
-                <h3>Current Offshore Conditions & Outlook</h3>
-                <div class="forecast-box">${escapeHtml(textData)}</div>
-            `;
+            const data = await response.json();
+            
+            // Extract text paragraphs from the standard NOAA JSON structure
+            if (data.properties && data.properties.periods) {
+                let formattedForecast = '';
+                
+                data.properties.periods.forEach(period => {
+                    formattedForecast += `** ${period.name} **\n${period.detailedForecast}\n\n`;
+                });
+
+                container.innerHTML = `
+                    <h3>Current Offshore Conditions & Outlook</h3>
+                    <div class="forecast-box">${escapeHtml(formattedForecast)}</div>
+                `;
+            } else {
+                throw new Error('Data structure from NOAA was missing periods.');
+            }
+            
         } catch (error) {
             container.innerHTML = `
-                <p class="error">Error loading weather conditions.</p>
-                <p>Please try again later or view the feed directly at 
-                <a href="${targetUrl}" target="_blank">NOAA Text Server</a>.</p>
+                <p class="error">Error loading weather conditions directly from the API.</p>
+                <p>The NOAA server may be experiencing high traffic or temporary downtime.</p>
             `;
             console.error('Fetch error:', error);
         }
