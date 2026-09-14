@@ -3,155 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hudson Canyon 1000 FM Marine Weather</title>
+    <title>Live Marine Buoy Conditions</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f4f8;
-            color: #102a43;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
             margin: 0;
             padding: 20px;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 30px;
+        .dashboard {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #1e293b;
+            padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
         }
         h1 {
-            color: #0b69a3;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 10px;
+            font-size: 1.5rem;
             margin-top: 0;
+            color: #38bdf8;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
         }
-        .meta-info {
-            font-size: 0.9em;
-            color: #627d98;
+        .meta {
+            font-size: 0.85rem;
+            color: #94a3b8;
             margin-bottom: 20px;
         }
-        .forecast-box {
-            background-color: #f8fafc;
-            border-left: 4px solid #0b69a3;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .card {
+            background: #0f172a;
             padding: 15px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 1.05em;
-            line-height: 1.6;
-            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        .card-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .card-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #f1f5f9;
+            margin-top: 5px;
         }
         .loading {
-            color: #627d98;
-            font-style: italic;
-        }
-        .error {
-            color: #d32f2f;
+            color: #ea580c;
             font-weight: bold;
+            animation: pulse 1.5s infinite;
         }
-        .refresh-btn {
-            background-color: #0b69a3;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1em;
-            margin-bottom: 20px;
-        }
-        .refresh-btn:hover {
-            background-color: #095585;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Hudson Canyon to Baltimore Canyon to 1000 FM</h1>
-    <div class="meta-info">Zone ID: ANZ820 | Source: NOAA Text Product API</div>
-    
-    <button class="refresh-btn" onclick="fetchMarineForecast()">Refresh Forecast</button>
-    
-    <div id="forecast-container">
-        <p class="loading">Fetching current marine conditions from NOAA...</p>
+<div class="dashboard">
+    <h1 id="station-title">Buoy 44025 Live Conditions</h1>
+    <div class="meta" id="station-meta">Loading latest NDBC transmission...</div>
+
+    <div id="data-grid" class="grid" style="display:none;">
+        <div class="card">
+            <div class="card-label">Wave Height</div>
+            <div id="wave-height" class="card-value">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Dominant Wave Period</div>
+            <div id="wave-period" class="card-value">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Wind Speed / Gust</div>
+            <div id="wind-speed" class="card-value">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Wind Direction</div>
+            <div id="wind-dir" class="card-value">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Water Temp</div>
+            <div id="water-temp" class="card-value">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Atmospheric Pressure</div>
+            <div id="pressure" class="card-value">--</div>
+        </div>
     </div>
+    
+    <div id="status-message" class="loading">Connecting to National Data Buoy Center...</div>
 </div>
 
 <script>
-    async function fetchMarineForecast() {
-        const container = document.getElementById('forecast-container');
-        container.innerHTML = '<p class="loading">Loading official offshore text product...</p>';
-        
-        // This endpoint fetches the most recent text forecast product issued for the regional offshore waters
-        const apiUrl = 'https://weather.gov';
+    // Using Station 44025 because 44066 is currently recovered/offline.
+    // Simply change this ID to test other active locations.
+    const STATION_ID = '44025'; 
+    
+    async function fetchBuoyData() {
+        const rawUrl = `https://noaa.gov{STATION_ID}.txt`;
+        const proxyUrl = `https://allorigins.win{encodeURIComponent(rawUrl)}`;
 
         try {
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'User-Agent': 'HudsonCanyonWeatherPage/2.0 (marine-safety-update@example.com)'
-                }
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Could not fetch buoy file.");
+            const text = await response.text();
+
+            // Split file into individual lines
+            const lines = text.trim().split('\n');
+            if (lines.length < 3) throw new Error("Empty data matrix returned.");
+
+            // Line 0 = Column headers, Line 1 = Units, Line 2 = Absolute latest data row
+            const headers = lines[0].trim().split(/\s+/);
+            const latestRow = lines[2].trim().split(/\s+/);
+
+            // Map columns to values dynamically
+            const data = {};
+            headers.forEach((header, index) => {
+                data[header] = latestRow[index];
             });
+
+            // Convert and populate UI values (checking for missing "MM" tokens)
+            document.getElementById('wave-height').innerText = data.WVHT !== 'MM' ? `${(parseFloat(data.WVHT) * 3.28084).toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-period').innerText = data.DPD !== 'MM' ? `${data.DPD} sec` : 'N/A';
             
-            if (!response.ok) throw new Error('API request failed');
+            const windSpeedKts = data.WSPD !== 'MM' ? (parseFloat(data.WSPD) * 1.94384).toFixed(1) : 'N/A';
+            const windGustKts = data.GST !== 'MM' ? (parseFloat(data.GST) * 1.94384).toFixed(1) : 'N/A';
+            document.getElementById('wind-speed').innerText = `${windSpeedKts} / ${windGustKts} kts`;
             
-            const data = await response.json();
+            document.getElementById('wind-dir').innerText = data.WDIR !== 'MM' ? `${data.WDIR}°` : 'N/A';
+            document.getElementById('water-temp').innerText = data.WTMP !== 'MM' ? `${((parseFloat(data.WTMP) * 9/5) + 32).toFixed(1)} °F` : 'N/A';
+            document.getElementById('pressure').innerText = data.BAR !== 'MM' ? `${data.BAR} hPa` : 'N/A';
+
+            // Update timestamp
+            document.getElementById('station-meta').innerText = `Latest Reading: ${data['#YY']}-${data.MM}-${data.DD} @ ${data.hh}:${data.mm} UTC`;
             
-            // Get the text from the primary index entry [@graph or graph list]
-            if (data['@graph'] && data['@graph'][0] && data['@graph'][0].productText) {
-                renderText(data['@graph'][0].productText, container);
-            } else if (data.products && data.products[0]) {
-                // Secondary check: Fetch the text directly from the latest single product item URL if grouped indices are different
-                const specificProductUrl = data.products[0]['@id'];
-                const productResponse = await fetch(specificProductUrl, {
-                    headers: { 'User-Agent': 'HudsonCanyonWeatherPage/2.0' }
-                });
-                const productData = await productResponse.json();
-                renderText(productData.productText, container);
-            } else {
-                throw new Error('Text field not found in response');
-            }
-            
+            // Toggle visibility
+            document.getElementById('status-message').style.display = 'none';
+            document.getElementById('data-grid').style.display = 'grid';
+
         } catch (error) {
-            // Bulletproof Fallback: Direct iframe embedding if API fails due to temporary traffic
-            container.innerHTML = `
-                <p class="error">Direct API collection timed out.</p>
-                <p>Displaying the official web report mirror below:</p>
-                <iframe src="https://weather.gov" style="width:100%; height:500px; border:1px solid #cbd5e1; border-radius:6px;"></iframe>
-            `;
-            console.error('Fetch error:', error);
+            document.getElementById('status-message').innerText = `Error: Unable to process data from Buoy ${STATION_ID}. It may be undergoing maintenance.`;
+            document.getElementById('status-message').className = '';
+            document.getElementById('status-message').style.color = '#ef4444';
+            console.error(error);
         }
     }
 
-    function renderText(rawText, containerElement) {
-        // Find the specific section for ANZ820 out of the broader offshore document
-        let sectionText = rawText;
-        const searchPattern = /ANZ820/i;
-        
-        if (searchPattern.test(rawText)) {
-            const index = rawText.search(searchPattern);
-            // Slice the text from ANZ820 onward to hide unrelated regions, or show full text if needed
-            sectionText = rawText.substring(index);
-        }
-
-        containerElement.innerHTML = `
-            <h3>Live Offshore Forecast & Marine Warnings</h3>
-            <div class="forecast-box">${escapeHtml(sectionText)}</div>
-        `;
-    }
-
-    function escapeHtml(text) {
-        return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    // Initialize immediately
-    fetchMarineForecast();
+    fetchBuoyData();
 </script>
 
 </body>
 </html>
-
