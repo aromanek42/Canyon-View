@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Marine Buoy Conditions</title>
+    <title>Live Northeast Buoy Conditions</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -65,23 +65,13 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        .debug-error {
-            color: #ef4444;
-            font-family: monospace;
-            background: #451a1a;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            margin-top: 15px;
-            white-space: pre-wrap;
-        }
     </style>
 </head>
 <body>
 
 <div class="dashboard">
     <h1 id="station-title">Buoy 44065 Live Conditions</h1>
-    <div class="meta" id="station-meta">Loading latest NDBC transmission...</div>
+    <div class="meta" id="station-meta">Connecting to NERACOOS oceanographic servers...</div>
 
     <div id="data-grid" class="grid" style="display:none;">
         <div class="card">
@@ -93,7 +83,7 @@
             <div id="wave-period" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Wind Speed / Gust</div>
+            <div class="card-label">Wind Speed</div>
             <div id="wind-speed" class="card-value">--</div>
         </div>
         <div class="card">
@@ -105,80 +95,61 @@
             <div id="water-temp" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Atmospheric Pressure</div>
-            <div id="pressure" class="card-value">--</div>
+            <div class="card-label">Air Temp</div>
+            <div id="air-temp" class="card-value">--</div>
         </div>
     </div>
     
-    <div id="status-message" class="loading">Connecting to National Data Buoy Center...</div>
-    <div id="debug-box" style="display: none;"></div>
+    <div id="status-message" class="loading">Requesting real-time telemetry array...</div>
 </div>
 
 <script>
-    // Station 44065 is active and operational near NY Harbor entrance/shelf edge
-    const STATION_ID = '44065'; 
-    
     async function fetchBuoyData() {
         const statusElement = document.getElementById('status-message');
-        const debugBox = document.getElementById('debug-box');
         
-        const rawUrl = `https://noaa.gov{STATION_ID}.txt`;
-        const proxyUrl = `https://allorigins.win{encodeURIComponent(rawUrl)}`;
+        // NERACOOS ERDDAP JSON endpoint for Buoy 44065 requesting the absolute latest 1 record
+        const apiUrl = 'https://neracoos.org';
 
         try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error(`HTTP network error! Status: ${response.status}`);
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error("API service returned an error status.");
             
-            const text = await response.text();
-
-            // Split raw text data into individual clean string lines
-            const lines = text.trim().split('\n');
-            if (lines.length < 3) throw new Error("Empty or truncated data matrix returned from NDBC.");
-
-            // FIX: Explicitly target array row positions (0 for keys, 2 for absolute latest metrics)
-            const headers = lines[0].trim().split(/\s+/);
-            const latestRow = lines[2].trim().split(/\s+/);
-
-            // Assemble header array matching values explicitly
+            const json = await response.json();
+            
+            // Map column arrays to rows cleanly
+            const columns = json.table.columnNames;
+            const values = json.table.rows[0];
+            
             const data = {};
-            headers.forEach((header, index) => {
-                data[header] = latestRow[index];
+            columns.forEach((colName, index) => {
+                data[colName] = values[index];
             });
 
-            // Unit conversions from metric to marine standard imperial
-            document.getElementById('wave-height').innerText = data.WVHT && data.WVHT !== 'MM' ? `${(parseFloat(data.WVHT) * 3.28084).toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-period').innerText = data.DPD && data.DPD !== 'MM' ? `${data.DPD} sec` : 'N/A';
-            
-            const windSpeedKts = data.WSPD && data.WSPD !== 'MM' ? (parseFloat(data.WSPD) * 1.94384).toFixed(1) : 'N/A';
-            const windGustKts = data.GST && data.GST !== 'MM' ? (parseFloat(data.GST) * 1.94384).toFixed(1) : 'N/A';
-            document.getElementById('wind-speed').innerText = `${windSpeedKts} / ${windGustKts} kts`;
-            
-            document.getElementById('wind-dir').innerText = data.WDIR && data.WDIR !== 'MM' ? `${data.WDIR}°` : 'N/A';
-            document.getElementById('water-temp').innerText = data.WTMP && data.WTMP !== 'MM' ? `${((parseFloat(data.WTMP) * 9/5) + 32).toFixed(1)} °F` : 'N/A';
-            document.getElementById('pressure').innerText = data.BAR && data.BAR !== 'MM' ? `${data.BAR} hPa` : 'N/A';
+            // Populate dashboard (converting standard metric units to marine imperial equivalents)
+            document.getElementById('wave-height').innerText = data.wave_height ? `${(data.wave_height * 3.28084).toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-period').innerText = data.dominant_wave_period ? `${data.dominant_wave_period} sec` : 'N/A';
+            document.getElementById('wind-speed').innerText = data.wind_speed ? `${(data.wind_speed * 1.94384).toFixed(1)} kts` : 'N/A';
+            document.getElementById('wind-dir').innerText = data.wind_direction ? `${data.wind_direction}°` : 'N/A';
+            document.getElementById('water-temp').innerText = data.sea_surface_temperature ? `${((data.sea_surface_temperature * 9/5) + 32).toFixed(1)} °F` : 'N/A';
+            document.getElementById('air-temp').innerText = data.air_temperature ? `${((data.air_temperature * 9/5) + 32).toFixed(1)} °F` : 'N/A';
 
             // Print the timestamp tracking exactly when the data payload was measured
-            document.getElementById('station-meta').innerText = `Latest Reading: ${data['#YY']}-${data.MM}-${data.DD} @ ${data.hh}:${data.mm} UTC`;
+            const cleanTime = new Date(data.time).toLocaleString();
+            document.getElementById('station-meta').innerText = `Latest Transmission: ${cleanTime}`;
             
-            // Toggle visibility to render dashboard cards
+            // Show the dashboard UI grid
             statusElement.style.display = 'none';
             document.getElementById('data-grid').style.display = 'grid';
 
         } catch (error) {
-            statusElement.innerText = `Error parsing live matrix stream from Buoy ${STATION_ID}.`;
+            statusElement.innerText = "Error: Unable to process data from the ERDDAP server.";
             statusElement.className = '';
             statusElement.style.color = '#ef4444';
-            
-            // Display exact code error info below so we can see exactly what failed
-            debugBox.className = 'debug-error';
-            debugBox.style.display = 'block';
-            debugBox.innerText = `Technical Details: ${error.message}`;
-            console.error(error);
+            console.error("Technical trace:", error);
         }
     }
 
     fetchBuoyData();
 </script>
-
 </body>
 </html>
