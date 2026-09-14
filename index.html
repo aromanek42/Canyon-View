@@ -68,7 +68,7 @@
 
 <div class="container">
     <h1>Hudson Canyon to Baltimore Canyon to 1000 FM</h1>
-    <div class="meta-info">Zone ID: ANZ820 | Data Source: NWS API</div>
+    <div class="meta-info">Zone ID: ANZ820 | Source: NOAA Text Product API</div>
     
     <button class="refresh-btn" onclick="fetchMarineForecast()">Refresh Forecast</button>
     
@@ -80,46 +80,63 @@
 <script>
     async function fetchMarineForecast() {
         const container = document.getElementById('forecast-container');
-        container.innerHTML = '<p class="loading">Connecting directly to NOAA API...</p>';
+        container.innerHTML = '<p class="loading">Loading official offshore text product...</p>';
         
-        // Direct, proxy-free official NOAA API endpoint for marine zone ANZ820
+        // This endpoint fetches the most recent text forecast product issued for the regional offshore waters
         const apiUrl = 'https://weather.gov';
 
         try {
-            // NOAA API requires a unique User-Agent identifier to handle API volume
             const response = await fetch(apiUrl, {
                 headers: {
-                    'User-Agent': 'MyHudsonCanyonWeatherPage/1.0 (contact@example.com)'
+                    'User-Agent': 'HudsonCanyonWeatherPage/2.0 (marine-safety-update@example.com)'
                 }
             });
             
-            if (!response.ok) throw new Error('NOAA API returned an error status.');
+            if (!response.ok) throw new Error('API request failed');
             
             const data = await response.json();
             
-            // Extract text paragraphs from the standard NOAA JSON structure
-            if (data.properties && data.properties.periods) {
-                let formattedForecast = '';
-                
-                data.properties.periods.forEach(period => {
-                    formattedForecast += `** ${period.name} **\n${period.detailedForecast}\n\n`;
+            // Get the text from the primary index entry [@graph or graph list]
+            if (data['@graph'] && data['@graph'][0] && data['@graph'][0].productText) {
+                renderText(data['@graph'][0].productText, container);
+            } else if (data.products && data.products[0]) {
+                // Secondary check: Fetch the text directly from the latest single product item URL if grouped indices are different
+                const specificProductUrl = data.products[0]['@id'];
+                const productResponse = await fetch(specificProductUrl, {
+                    headers: { 'User-Agent': 'HudsonCanyonWeatherPage/2.0' }
                 });
-
-                container.innerHTML = `
-                    <h3>Current Offshore Conditions & Outlook</h3>
-                    <div class="forecast-box">${escapeHtml(formattedForecast)}</div>
-                `;
+                const productData = await productResponse.json();
+                renderText(productData.productText, container);
             } else {
-                throw new Error('Data structure from NOAA was missing periods.');
+                throw new Error('Text field not found in response');
             }
             
         } catch (error) {
+            // Bulletproof Fallback: Direct iframe embedding if API fails due to temporary traffic
             container.innerHTML = `
-                <p class="error">Error loading weather conditions directly from the API.</p>
-                <p>The NOAA server may be experiencing high traffic or temporary downtime.</p>
+                <p class="error">Direct API collection timed out.</p>
+                <p>Displaying the official web report mirror below:</p>
+                <iframe src="https://weather.gov" style="width:100%; height:500px; border:1px solid #cbd5e1; border-radius:6px;"></iframe>
             `;
             console.error('Fetch error:', error);
         }
+    }
+
+    function renderText(rawText, containerElement) {
+        // Find the specific section for ANZ820 out of the broader offshore document
+        let sectionText = rawText;
+        const searchPattern = /ANZ820/i;
+        
+        if (searchPattern.test(rawText)) {
+            const index = rawText.search(searchPattern);
+            // Slice the text from ANZ820 onward to hide unrelated regions, or show full text if needed
+            sectionText = rawText.substring(index);
+        }
+
+        containerElement.innerHTML = `
+            <h3>Live Offshore Forecast & Marine Warnings</h3>
+            <div class="forecast-box">${escapeHtml(sectionText)}</div>
+        `;
     }
 
     function escapeHtml(text) {
@@ -131,9 +148,10 @@
             .replace(/'/g, "&#039;");
     }
 
-    // Load forecast immediately on page load
+    // Initialize immediately
     fetchMarineForecast();
 </script>
 
 </body>
 </html>
+
