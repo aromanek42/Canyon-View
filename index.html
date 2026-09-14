@@ -3,220 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hudson Canyon Live Beaufort Monitor</title>
+    <title>Hudson Canyon 1000 FM Marine Weather</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #0c1013;
-            color: #e0e6ed;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #102a43;
             margin: 0;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
         }
-        .weather-card {
-            max-width: 550px;
-            width: 100%;
-            background: #141d26;
-            border-radius: 16px;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-            text-align: center;
-            border: 1px solid #243342;
-        }
-        h2 {
-            margin-top: 0;
-            color: #fff;
-            font-size: 1.6em;
-            letter-spacing: 0.5px;
-        }
-        .wind-speed-badge {
-            display: inline-block;
-            background: #1e2d3b;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            color: #70b5ff;
-            margin-bottom: 15px;
-        }
-        .status-tag {
-            font-size: 1.8em;
-            font-weight: 800;
-            margin: 15px 0 5px 0;
-            transition: color 0.3s ease;
-        }
-        .graphic-container {
-            width: 100%;
-            max-width: 400px;
-            margin: 20px auto;
             border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-            background: #000;
-            aspect-ratio: 4 / 3;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        .forecast-text {
-            font-size: 0.95em;
-            color: #8899a6;
-            line-height: 1.5;
-            background: #192431;
+        h1 {
+            color: #0b69a3;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .meta-info {
+            font-size: 0.9em;
+            color: #627d98;
+            margin-bottom: 20px;
+        }
+        .forecast-box {
+            background-color: #f8fafc;
+            border-left: 4px solid #0b69a3;
             padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            text-align: left;
-            border-left: 4px solid #1da1f2;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 1.05em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+        .loading {
+            color: #627d98;
+            font-style: italic;
+        }
+        .error {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background-color: #0b69a3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover {
+            background-color: #095585;
         }
     </style>
 </head>
 <body>
 
-<div class="weather-card">
-    <h2>Hudson Canyon 1000 FM</h2>
-    <div class="wind-speed-badge" id="raw-wind">Reading NOAA Data...</div>
+<div class="container">
+    <h1>Hudson Canyon to Baltimore Canyon to 1000 FM</h1>
+    <div class="meta-info">Zone ID: ANZ820 | Data Source: National Weather Service</div>
     
-    <div class="status-tag" id="beaufort-status">Force --</div>
-    <div style="font-size: 0.9em; color:#a0a0a0;" id="beaufort-desc">Determining sea state...</div>
+    <button class="refresh-btn" onclick="fetchMarineForecast()">Refresh Forecast</button>
     
-    <!-- Dynamic SVG Target Container -->
-    <div class="graphic-container" id="svg-container"></div>
-    
-    <div class="forecast-text" id="forecast-text">Fetching latest offshore text forecast...</div>
+    <div id="forecast-container">
+        <p class="loading">Fetching current marine conditions from NOAA...</p>
+    </div>
 </div>
 
 <script>
-        // We route the NOAA endpoint through a public CORS proxy to bypass browser security blocks
-    const apiURL = "https://corsproxy.io";
+    async function fetchMarineForecast() {
+        const container = document.getElementById('forecast-container');
+        container.innerHTML = '<p class="loading">Updating live text...</p>';
+        
+        // Target the official NWS marine text product endpoint
+        const targetUrl = 'https://noaa.gov';
+        // Utilizing a public CORS proxy to allow browser-side fetching
+        const proxyUrl = 'https://allorigins.win' + encodeURIComponent(targetUrl);
 
-    async function updateBeaufortDisplay() {
         try {
-            // No custom headers are needed when using the proxy
-            const response = await fetch(apiURL);
-            if (!response.ok) throw new Error("API call failed");
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Network response failed');
             
-            const data = await response.json();
-            const currentForecastText = data.properties.periods[0].detailedForecast;
-            document.getElementById('forecast-text').innerText = currentForecastText;
-
-            // Extract numbers preceding "kt" to determine velocity
-            const knotMatch = currentForecastText.match(/(\d+)\s*to\s*(\d+)\s*kt/i) || currentForecastText.match(/(\d+)\s*kt/i);
+            const textData = await response.text();
             
-            let maxKnots = 0;
-            if (knotMatch) {
-                // Grab the higher digit value inside a range description or the single number
-                maxKnots = knotMatch[2] ? parseInt(knotMatch[2]) : parseInt(knotMatch[1]);
-                document.getElementById('raw-wind').innerText = `Live Wind Window: ${maxKnots} Knots Max`;
-            } else {
-                document.getElementById('raw-wind').innerText = "Wind: Light / Variable";
-            }
-
-            const force = getBeaufortForce(maxKnots);
-            const condition = beaufortMeta[force];
-
-            // Render status texts
-            const statusTag = document.getElementById('beaufort-status');
-            statusTag.innerText = `Force ${force}: ${condition.name}`;
-            statusTag.style.color = condition.dynamicColor;
-            document.getElementById('beaufort-desc').innerText = condition.desc;
-
-            // Generate and inject the custom inline SVG vector graphic
-            document.getElementById('svg-container').innerHTML = generateSeaStateSVG(force);
-
-        } catch (error) {
-            console.error("Error setting up dynamic marine vector graphic:", error);
-            document.getElementById('raw-wind').innerText = "Data unavailable";
-            document.getElementById('forecast-text').innerText = "Failed to communicate with NOAA servers. Please refresh the page.";
-        }
-    }
-
-
-    // This function generates the SVG template dynamically based on Beaufort specs
-    function generateSeaStateSVG(force) {
-        const config = beaufortMeta[force];
-        const amp = config.waveAmp;
-        
-        // Define paths for two layers of waves using sine-wave approximations
-        let wavePathBehind = `M 0 220 Q 100 ${220 - amp * 0.7} 200 220 T 400 220 L 400 300 L 0 300 Z`;
-        let wavePathFront  = `M 0 240 Q 80  ${240 - amp}       160 240 T 320 240 T 400 240 L 400 300 L 0 300 Z`;
-        
-        // Add extreme jagged peaks for severe storm warnings (Force 8+)
-        if (force >= 8) {
-            wavePathFront = `M 0 240 L 50 ${240 - amp} L 100 245 L 170 ${230 - amp} L 240 250 L 310 ${235 - amp} L 400 240 L 400 300 L 0 300 Z`;
-        }
-
-        // Conditionally generate foam lines
-        let foamElements = '';
-        if (config.foam) {
-            const opacity = Math.min(0.2 + (force * 0.06), 0.9);
-            foamElements = `
-                <path d="M 10 ${230 - amp*0.3} Q 90 ${220 - amp*0.5} 150 ${235 - amp*0.2}" stroke="#ffffff" stroke-width="${Math.min(2 + force, 8)}" fill="none" opacity="${opacity}" stroke-dasharray="10 15"/>
-                <path d="M 120 ${245 - amp*0.6} Q 220 ${230 - amp*0.8} 340 ${240 - amp*0.4}" stroke="#ffffff" stroke-width="${Math.min(3 + force, 10)}" fill="none" opacity="${opacity}" stroke-dasharray="30 10 10 20"/>
+            // Render the raw formatted text report directly from NOAA
+            container.innerHTML = `
+                <h3>Current Offshore Conditions & Outlook</h3>
+                <div class="forecast-box">${escapeHtml(textData)}</div>
             `;
+        } catch (error) {
+            container.innerHTML = `
+                <p class="error">Error loading weather conditions.</p>
+                <p>Please try again later or view the feed directly at 
+                <a href="${targetUrl}" target="_blank">NOAA Text Server</a>.</p>
+            `;
+            console.error('Fetch error:', error);
         }
-
-        // Dynamically add wind lines crossing the sky depending on severity
-        let windLines = '';
-        const windCount = Math.min(force, 8); 
-        for (let i = 0; i < windCount; i++) {
-            let yPos = 40 + (i * 20);
-            let length = 40 + (force * 15);
-            let xPos = 30 + (i * 25);
-            windLines += `<line x1="${xPos}" y1="${yPos}" x2="${xPos + length}" y2="${yPos}" stroke="#ffffff" stroke-width="${Math.max(1, force/3)}" opacity="${0.1 + (force/20)}" />`;
-        }
-
-        // Return the full integrated inline SVG string
-        return `
-            <svg viewBox="0 0 400 300" width="100%" height="100%" xmlns="http://w3.org">
-                <!-- Sky/Background -->
-                <rect width="400" height="300" fill="${config.sky}" />
-                
-                <!-- Wind Lines -->
-                ${windLines}
-                
-                <!-- Distant Wave Layer -->
-                <path d="${wavePathBehind}" fill="${config.water}" opacity="0.6"/>
-                
-                <!-- Foreground Wave Layer -->
-                <path d="${wavePathFront}" fill="${config.water}"/>
-                
-                <!-- Breaking Crests/Foam/Spindrift -->
-                ${foamElements}
-            </svg>
-        `;
     }
 
-    async function updateBeaufortDisplay() {
-        try {
-          const response = await fetch(apiURL, {
-    headers: { 'User-Agent': 'HudsonCanyonWeatherMonitor (aromanek86@gmail.com)' }
-});
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-            if (!response.ok) throw new Error("API call failed");
-            
-            const data = await response.json();
-            const currentForecastText = data.properties.periods[0].detailedForecast;
-            document.getElementById('forecast-text').innerText = currentForecastText;
+    // Load forecast immediately on page load
+    fetchMarineForecast();
+</script>
 
-            // Extract numbers preceding "kt" to determine velocity
-            const knotMatch = currentForecastText.match(/(\d+)\s*to\s*(\d+)\s*kt/i) || currentForecastText.match(/(\d+)\s*kt/i);
-            
-            let maxKnots = 0;
-            if (knotMatch) {
-                // Grab the higher digit value inside a range description
-                maxKnots = knotMatch[2] ? parseInt(knotMatch[2]) : parseInt(knotMatch[1]);
-                document.getElementById('raw-wind').innerText = `Live Wind Window: ${maxKnots} Knots Max`;
-            } else {
-                document.getElementById('raw-wind').innerText = "Wind: Light / Variable";
-            }
-
-            const force = getBeaufortForce(maxKnots);
-            const condition = beaufortMeta[force];
-
-            // Render status texts
-            const statusTag = document.getElementById('beaufort-status');
-            statusTag.innerText = `Force ${force}: ${condition.name}`;
-            statusTag.style.color = condition.dynamicColor;
-            document.getElementById('beaufort-desc').innerText = condition.desc;
-
-            // Generate and inject the custom inline SVG vector graphic
+</body>
+</html>
