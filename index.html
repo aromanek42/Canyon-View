@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Northeast Buoy Conditions</title>
+    <title>Hudson Canyon 1000 FM Live Telemetry</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #0f172a;
+            background-color: #0b1329;
             color: #f8fafc;
             margin: 0;
             padding: 20px;
@@ -15,17 +15,17 @@
         .dashboard {
             max-width: 600px;
             margin: 40px auto;
-            background: #1e293b;
+            background: #1c2541;
             padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
-            border: 1px solid #334155;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 1px solid #3b82f633;
         }
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             margin-top: 0;
             color: #38bdf8;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #3b82f633;
             padding-bottom: 10px;
         }
         .meta {
@@ -39,10 +39,10 @@
             gap: 15px;
         }
         .card {
-            background: #0f172a;
+            background: #0b1329;
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #1e293b;
         }
         .card-label {
             font-size: 0.8rem;
@@ -57,7 +57,7 @@
             margin-top: 5px;
         }
         .loading {
-            color: #ea580c;
+            color: #38bdf8;
             font-weight: bold;
             animation: pulse 1.5s infinite;
         }
@@ -70,12 +70,12 @@
 <body>
 
 <div class="dashboard">
-    <h1 id="station-title">Buoy 44065 Live Conditions</h1>
-    <div class="meta" id="station-meta">Connecting to NERACOOS oceanographic servers...</div>
+    <h1>Hudson Canyon (1000 FM)</h1>
+    <div class="meta">Coordinates: 39.55°N, 72.41°W | Source: Global Ocean Wave Models</div>
 
     <div id="data-grid" class="grid" style="display:none;">
         <div class="card">
-            <div class="card-label">Wave Height</div>
+            <div class="card-label">Significant Wave Height</div>
             <div id="wave-height" class="card-value">--</div>
         </div>
         <div class="card">
@@ -83,73 +83,76 @@
             <div id="wave-period" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Wind Speed</div>
-            <div id="wind-speed" class="card-value">--</div>
+            <div class="card-label">Swell Wave Height</div>
+            <div id="swell-height" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Wind Direction</div>
-            <div id="wind-dir" class="card-value">--</div>
+            <div class="card-label">Swell Direction</div>
+            <div id="swell-dir" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Water Temp</div>
-            <div id="water-temp" class="card-value">--</div>
+            <div class="card-label">Wind Wave Height</div>
+            <div id="wind-wave" class="card-value">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Air Temp</div>
-            <div id="air-temp" class="card-value">--</div>
+            <div class="card-label">Wave Direction</div>
+            <div id="wave-dir" class="card-value">--</div>
         </div>
     </div>
     
-    <div id="status-message" class="loading">Requesting real-time telemetry array...</div>
+    <div id="status-message" class="loading">Querying open-ocean wave grid parameters...</div>
 </div>
 
 <script>
-    async function fetchBuoyData() {
+    async function fetchCanyonData() {
         const statusElement = document.getElementById('status-message');
         
-        // NERACOOS ERDDAP JSON endpoint for Buoy 44065 requesting the absolute latest 1 record
-        const apiUrl = 'https://neracoos.org';
+        // Exact location coordinates for Hudson Canyon's deep offshore 1000 FM contour drop
+        const lat = 39.5518;
+        const lon = -72.4075;
+        
+        // Querying Open-Meteo's specific offshore marine engine using imperial lengths (feet)
+        const apiUrl = `https://open-meteo.com{lat}&longitude=${lon}&hourly=wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_direction,wind_wave_height&length_unit=imperial&timezone=auto`;
 
         try {
             const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error("API service returned an error status.");
+            if (!response.ok) throw new Error("Marine API failed to respond.");
             
             const json = await response.json();
             
-            // Map column arrays to rows cleanly
-            const columns = json.table.columnNames;
-            const values = json.table.rows[0];
-            
-            const data = {};
-            columns.forEach((colName, index) => {
-                data[colName] = values[index];
-            });
+            // Get current hour index from the timeline array to isolate the real-time conditions row
+            const now = new Date();
+            const currentHourString = now.toISOString().substring(0, 14) + "00"; 
+            const timeIndex = json.hourly.time.findIndex(t => t.startsWith(currentHourString)) || 0;
 
-            // Populate dashboard (converting standard metric units to marine imperial equivalents)
-            document.getElementById('wave-height').innerText = data.wave_height ? `${(data.wave_height * 3.28084).toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-period').innerText = data.dominant_wave_period ? `${data.dominant_wave_period} sec` : 'N/A';
-            document.getElementById('wind-speed').innerText = data.wind_speed ? `${(data.wind_speed * 1.94384).toFixed(1)} kts` : 'N/A';
-            document.getElementById('wind-dir').innerText = data.wind_direction ? `${data.wind_direction}°` : 'N/A';
-            document.getElementById('water-temp').innerText = data.sea_surface_temperature ? `${((data.sea_surface_temperature * 9/5) + 32).toFixed(1)} °F` : 'N/A';
-            document.getElementById('air-temp').innerText = data.air_temperature ? `${((data.air_temperature * 9/5) + 32).toFixed(1)} °F` : 'N/A';
+            // Extract real-time metrics cleanly out of the hourly arrays
+            const waveHeight = json.hourly.wave_height[timeIndex];
+            const wavePeriod = json.hourly.wave_period[timeIndex];
+            const waveDir = json.hourly.wave_direction[timeIndex];
+            const swellHeight = json.hourly.swell_wave_height[timeIndex];
+            const swellDir = json.hourly.swell_wave_direction[timeIndex];
+            const windWave = json.hourly.wind_wave_height[timeIndex];
 
-            // Print the timestamp tracking exactly when the data payload was measured
-            const cleanTime = new Date(data.time).toLocaleString();
-            document.getElementById('station-meta').innerText = `Latest Transmission: ${cleanTime}`;
-            
-            // Show the dashboard UI grid
+            // Render out elements directly onto our page elements
+            document.getElementById('wave-height').innerText = waveHeight ? `${waveHeight.toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-period').innerText = wavePeriod ? `${wavePeriod.toFixed(0)} sec` : 'N/A';
+            document.getElementById('swell-height').innerText = swellHeight ? `${swellHeight.toFixed(1)} ft` : 'N/A';
+            document.getElementById('swell-dir').innerText = swellDir ? `${swellDir}°` : 'N/A';
+            document.getElementById('wind-wave').innerText = windWave ? `${windWave.toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-dir').innerText = waveDir ? `${waveDir}°` : 'N/A';
+
+            // Hide initial loading screen and toggle visibility
             statusElement.style.display = 'none';
             document.getElementById('data-grid').style.display = 'grid';
 
         } catch (error) {
-            statusElement.innerText = "Error: Unable to process data from the ERDDAP server.";
-            statusElement.className = '';
+            statusElement.innerText = "Error: Failed to stream ocean wave telemetry data grid.";
             statusElement.style.color = '#ef4444';
-            console.error("Technical trace:", error);
+            console.error(error);
         }
     }
 
-    fetchBuoyData();
+    fetchCanyonData();
 </script>
 </body>
 </html>
