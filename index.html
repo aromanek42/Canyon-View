@@ -3,20 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hudson Canyon Marine Weather</title>
+    <title>Hudson Canyon Live Marine Weather</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f7f9; color: #222; padding: 20px; }
-        .card { max-width: 750px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e1e8ed; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f0f4f8; color: #222; padding: 20px; }
+        .card { max-width: 750px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #d1d8e0; }
         .header { background: #004b87; color: white; padding: 20px; }
-        .header h1 { margin: 0; font-size: 20px; }
-        .header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.8; }
-        .content { padding: 25px; }
-        .period { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed #e1e8ed; }
-        .period:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-        .period-name { font-weight: 700; color: #004b87; text-transform: uppercase; font-size: 14px; margin-bottom: 4px; }
-        .period-text { font-size: 15px; line-height: 1.6; }
-        .loading { text-align: center; color: #666; padding: 40px; font-style: italic; }
-        .error { color: #d9534f; padding: 25px; text-align: center; font-weight: bold; }
+        .header h1 { margin: 0; font-size: 22px; letter-spacing: 0.5px; }
+        .header p { margin: 6px 0 0 0; font-size: 13px; opacity: 0.85; font-style: italic; }
+        .content { padding: 25px; background: #ffffff; }
+        .forecast-text { white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", Courier, monospace; font-size: 15px; line-height: 1.6; color: #1a252f; background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef; }
+        .loading { text-align: center; color: #004b87; padding: 40px; font-weight: bold; }
+        .error { color: #c0392b; padding: 25px; text-align: center; font-weight: bold; background: #fdf2f2; border-radius: 6px; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
@@ -24,69 +21,53 @@
 <div class="card">
     <div class="header">
         <h1>Hudson Canyon to 1000 FM</h1>
-        <p id="update-time">Connecting to live NOAA marine data...</p>
+        <p id="update-time">Connecting to live NOAA feed...</p>
     </div>
     <div class="content" id="forecast-container">
-        <div class="loading">Loading current conditions from api.weather.gov...</div>
+        <div class="loading">Fetching current conditions from National Weather Service...</div>
     </div>
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    // The exact functional endpoint for the Hudson Canyon Marine Zone (ANZ820)
-    const endpoint = "https://weather.gov";
+    // We target the official NOAA RSS/XML marine feed for zone anz820
+    const rawRssUrl = "https://weather.gov";
+    
+    // We use an open, open-source feed converter to change the strict XML data into GitHub-friendly JSON
+    const proxyApiEndpoint = `https://rss2json.com{encodeURIComponent(rawRssUrl)}`;
 
-    fetch(endpoint, {
-        headers: {
-            // A descriptive User-Agent lets the NWS API know you're a safe public web application
-            "User-Agent": "GitHubPagesMarineApp (canyonapp@example.com)"
-        }
-    })
+    fetch(proxyApiEndpoint)
     .then(response => {
-        if (!response.ok) {
-            throw new Error(`NOAA API status check failed: ${response.status}`);
-        }
+        if (!response.ok) throw new Error("The weather feed service is temporarily unresponsive.");
         return response.json();
     })
     .then(data => {
         const container = document.getElementById("forecast-container");
         const timeElement = document.getElementById("update-time");
-        
-        // Formats the update timestamp text
-        if (data.properties && data.properties.updated) {
-            const updateDate = new Date(data.properties.updated);
-            timeElement.textContent = `Updated: ${updateDate.toLocaleString()}`;
-        }
 
-        // Extracts the array of forecast periods
-        const periods = data.properties.periods;
-        if (periods && periods.length > 0) {
-            container.innerHTML = ""; // Wipe the initial loading text
+        if (data.status === "ok" && data.items && data.items.length > 0) {
+            // Extract the latest bulletin entry
+            const latestEntry = data.items[0];
             
-            periods.forEach(period => {
-                const periodDiv = document.createElement("div");
-                periodDiv.className = "period";
+            // Clean up text formatting adjustments
+            let forecastCleanText = latestEntry.description;
+            
+            // Update timestamp
+            timeElement.textContent = "Live Offshore Marine Bulletin";
 
-                const nameDiv = document.createElement("div");
-                nameDiv.className = "period-name";
-                nameDiv.textContent = period.name;
-
-                const textDiv = document.createElement("div");
-                textDiv.className = "period-text";
-                textDiv.textContent = period.detailedForecast;
-
-                periodDiv.appendChild(nameDiv);
-                periodDiv.appendChild(textDiv);
-                container.appendChild(periodDiv);
-            });
+            // Render the raw, text-based marine forecast directly into the container
+            container.innerHTML = `<div class="forecast-text">${forecastCleanText}</div>`;
         } else {
-            container.innerHTML = `<div class="error">No periods returned in the marine forecast data.</div>`;
+            throw new Error("Marine forecast data for ANZ820 is currently blank or offline.");
         }
     })
     .catch(error => {
         console.error("Fetch Error:", error);
         document.getElementById("forecast-container").innerHTML = 
-            `<div class="error">Unable to display live data.<br><small style="font-weight:normal; color:#888;">${error.message}</small></div>`;
+            `<div class="error">
+                Unable to display live data.<br>
+                <span style="font-weight:normal; font-size:13px; color:#555;">Reason: ${error.message}</span>
+            </div>`;
     });
 });
 </script>
