@@ -71,7 +71,7 @@
 
 <div class="dashboard">
     <h1>Hudson Canyon (1000 FM)</h1>
-    <div class="meta">Coordinates: 39.55°N, 72.41°W | Source: Global Ocean Wave Models</div>
+    <div class="meta" id="station-meta">Coordinates: 39.55°N, 72.41°W | Source: Global Ocean Wave Models</div>
 
     <div id="data-grid" class="grid" style="display:none;">
         <div class="card">
@@ -120,12 +120,33 @@
             
             const json = await response.json();
             
-            // Get current hour index from the timeline array to isolate the real-time conditions row
             const now = new Date();
-            const currentHourString = now.toISOString().substring(0, 14) + "00"; 
-            const timeIndex = json.hourly.time.findIndex(t => t.startsWith(currentHourString)) || 0;
+            let timeIndex = -1;
 
-            // Extract real-time metrics cleanly out of the hourly arrays
+            // 1. Try matching using local browser time values
+            const localYear = now.getFullYear();
+            const localMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const localDay = String(now.getDate()).padStart(2, '0');
+            const localHour = String(now.getHours()).padStart(2, '0');
+            const localTarget = `${localYear}-${localMonth}-${localDay}T${localHour}:00`;
+            timeIndex = json.hourly.time.indexOf(localTarget);
+
+            // 2. Fallback: Try matching using UTC time strings if timezones skew
+            if (timeIndex === -1) {
+                const utcYear = now.getUTCFullYear();
+                const utcMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
+                const utcDay = String(now.getUTCDate()).padStart(2, '0');
+                const utcHour = String(now.getUTCHours()).padStart(2, '0');
+                const utcTarget = `${utcYear}-${utcMonth}-${utcDay}T${utcHour}:00`;
+                timeIndex = json.hourly.time.indexOf(utcTarget);
+            }
+
+            // 3. Absolute Fallback: Default to index 0 if the API payload matches an offset day grid
+            if (timeIndex === -1) {
+                timeIndex = 0;
+            }
+
+            // Extract metrics securely using our verified array index pointer
             const waveHeight = json.hourly.wave_height[timeIndex];
             const wavePeriod = json.hourly.wave_period[timeIndex];
             const waveDir = json.hourly.wave_direction[timeIndex];
@@ -133,15 +154,18 @@
             const swellDir = json.hourly.swell_wave_direction[timeIndex];
             const windWave = json.hourly.wind_wave_height[timeIndex];
 
-            // Render out elements directly onto our page elements
-            document.getElementById('wave-height').innerText = waveHeight ? `${waveHeight.toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-period').innerText = wavePeriod ? `${wavePeriod.toFixed(0)} sec` : 'N/A';
-            document.getElementById('swell-height').innerText = swellHeight ? `${swellHeight.toFixed(1)} ft` : 'N/A';
-            document.getElementById('swell-dir').innerText = swellDir ? `${swellDir}°` : 'N/A';
-            document.getElementById('wind-wave').innerText = windWave ? `${windWave.toFixed(1)} ft` : 'N/A';
-            document.getElementById('wave-dir').innerText = waveDir ? `${waveDir}°` : 'N/A';
+            // Render numeric metrics safely
+            document.getElementById('wave-height').innerText = typeof waveHeight === 'number' ? `${waveHeight.toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-period').innerText = typeof wavePeriod === 'number' ? `${wavePeriod.toFixed(0)} sec` : 'N/A';
+            document.getElementById('swell-height').innerText = typeof swellHeight === 'number' ? `${swellHeight.toFixed(1)} ft` : 'N/A';
+            document.getElementById('swell-dir').innerText = typeof swellDir === 'number' ? `${swellDir}°` : 'N/A';
+            document.getElementById('wind-wave').innerText = typeof windWave === 'number' ? `${windWave.toFixed(1)} ft` : 'N/A';
+            document.getElementById('wave-dir').innerText = typeof waveDir === 'number' ? `${waveDir}°` : 'N/A';
 
-            // Hide initial loading screen and toggle visibility
+            // Print the timestamp tracking exactly when the data payload was measured
+            document.getElementById('station-meta').innerText = `Data Frame Time: ${json.hourly.time[timeIndex]} | Coordinates: 39.55°N, 72.41°W`;
+
+            // Toggle visibility
             statusElement.style.display = 'none';
             document.getElementById('data-grid').style.display = 'grid';
 
@@ -156,3 +180,4 @@
 </script>
 </body>
 </html>
+
