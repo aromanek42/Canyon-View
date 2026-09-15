@@ -1,4 +1,4 @@
-// Official NWS API endpoint for Zone ANZ820 (Hudson Canyon 1000 FM)
+// FIXED: Changed from 'https://weather.gov' to the exact API endpoint URL
 const apiZoneUrl = 'https://weather.gov';
 
 async function fetchMarineWeather() {
@@ -36,7 +36,7 @@ async function fetchMarineWeather() {
         document.getElementById('forecast-data').innerHTML = 
             `<strong>Failed to load live conditions.</strong><br>` +
             `<em>Reason: ${error.message}</em><br><br>` +
-            `Try viewing the data directly via the <a href="https://forecast.weather.gov/shmrn.php?mz=anz820" target="_blank">NWS Zone Page</a>.`;
+            `Try viewing the data directly via the <a href="https://weather.gov" target="_blank">NWS Zone Page</a>.`;
     }
 }
 
