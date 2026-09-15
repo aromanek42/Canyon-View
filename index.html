@@ -3,39 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Ocean Conditions Dashboard</title>
+    <title>Hudson Canyon Live Marine Conditions</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #0e1e2e; color: #fff; margin: 0; padding: 30px; display: flex; justify-content: center; }
-        .dashboard { background: #162a3d; width: 100%; max-width: 500px; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; }
-        h1 { color: #4dadf7; margin-top: 0; font-size: 24px; }
-        .coord { color: #8ca0b3; font-size: 13px; margin-bottom: 25px; }
-        .metric-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
-        .card { background: #1f374e; padding: 15px; border-radius: 8px; width: 40%; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
-        .card .title { font-size: 12px; color: #a3b8cc; text-transform: uppercase; margin-bottom: 5px; }
-        .card .value { font-size: 22px; font-weight: bold; color: #fff; }
-        .time { font-size: 12px; color: #697f94; margin-top: 15px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0b1329;
+            color: #f8fafc;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1c2541;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            border: 1px solid #3a506b;
+            text-align: center;
+        }
+        h1 { color: #4cc9f0; margin-top: 0; font-size: 24px; }
+        .coordinates { color: #64748b; font-size: 14px; margin-bottom: 25px; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric {
+            background: #0b1329;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #3a506b;
+        }
+        .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 22px; font-weight: bold; color: #4cc9f0; margin-top: 5px; }
+        .error { color: #ff0055; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="dashboard">
-    <h1>Hudson Canyon Conditions</h1>
-    <div class="coord">Location: 39.42°N, 72.41°W (1000 FM edge)</div>
+<div class="card">
+    <h1>Hudson Canyon (1000 FM Line)</h1>
+    <div class="coordinates">Location: 39.42°N, 72.24°W</div>
     
-    <div class="metric-container">
-        <div class="card">
-            <div class="title">Wave Height</div>
-            <div class="value" id="wave-height">-- m</div>
-        </div>
-        <div class="card">
-            <div class="title">Wind Speed</div>
-            <div class="value" id="wind-speed">-- km/h</div>
-        </div>
-    </div>
-
-    <div class="time" id="time-stamp">Fetching open-source ocean data...</div>
+    <div id="displayArea">Loading real-time marine data...</div>
 </div>
 
-<script src="app.js"></script>
+<script>
+    // Coordinates for the 1000 Fathom ledge on the Hudson Canyon
+    const lat = 39.42;
+    const lon = -72.24;
+    const url = `https://open-meteo.com{lat}&longitude=${lon}&current=wave_height,wave_direction,wind_wave_height,swell_wave_height&length_unit=imperial`;
+
+    async function getCorsFreeData() {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('API server issue');
+            const data = await response.json();
+            
+            renderMarineData(data.current);
+        } catch (error) {
+            document.getElementById('displayArea').innerHTML = 
+                `<p class="error">Error loading data: ${error.message}</p>`;
+        }
+    }
+
+    function renderMarineData(current) {
+        document.getElementById('displayArea').innerHTML = `
+            <div class="grid">
+                <div class="metric">
+                    <div class="label">🌊 Significant Wave</div>
+                    <div class="value">${current.wave_height} ft</div>
+                </div>
+                <div class="metric">
+                    <div class="label">🧭 Wave Direction</div>
+                    <div class="value">${current.wave_direction}°</div>
+                </div>
+                <div class="metric">
+                    <div class="label">💨 Wind Wave</div>
+                    <div class="value">${current.wind_wave_height} ft</div>
+                </div>
+                <div class="metric">
+                    <div class="label">🌊 Swell Height</div>
+                    <div class="value">${current.swell_wave_height} ft</div>
+                </div>
+            </div>
+        `;
+    }
+
+    getCorsFreeData();
+</script>
+
 </body>
 </html>
