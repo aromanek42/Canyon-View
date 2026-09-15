@@ -3,25 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hudson Canyon 1000 FM Marine Forecast</title>
+    <title>Global Ocean Conditions Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .dashboard-card { background: white; width: 100%; max-width: 700px; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 6px solid #00447c; }
-        h1 { color: #00447c; font-size: 22px; margin-top: 0; }
-        p { color: #555; font-size: 14px; margin-bottom: 20px; }
-        /* Style the embedded frame to blend in smoothly */
-        .noaa-frame { width: 100%; height: 650px; border: 1px solid #ddd; border-radius: 6px; background: white; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #0e1e2e; color: #fff; margin: 0; padding: 30px; display: flex; justify-content: center; }
+        .dashboard { background: #162a3d; width: 100%; max-width: 500px; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; }
+        h1 { color: #4dadf7; margin-top: 0; font-size: 24px; }
+        .coord { color: #8ca0b3; font-size: 13px; margin-bottom: 25px; }
+        .metric-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .card { background: #1f374e; padding: 15px; border-radius: 8px; width: 40%; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
+        .card .title { font-size: 12px; color: #a3b8cc; text-transform: uppercase; margin-bottom: 5px; }
+        .card .value { font-size: 22px; font-weight: bold; color: #fff; }
+        .time { font-size: 12px; color: #697f94; margin-top: 15px; }
     </style>
 </head>
 <body>
 
-<div class="dashboard-card">
-    <h1>Hudson Canyon to Baltimore Canyon (ANZ820)</h1>
-    <p>Live, real-time offshore marine conditions directly from the National Weather Service.</p>
+<div class="dashboard">
+    <h1>Hudson Canyon Conditions</h1>
+    <div class="coord">Location: 39.42°N, 72.41°W (1000 FM edge)</div>
     
-    <!-- This official NOAA target allows external embedding without throwing errors -->
-    <iframe class="noaa-frame" src="https://weather.gov"></iframe>
+    <div class="metric-container">
+        <div class="card">
+            <div class="title">Wave Height</div>
+            <div class="value" id="wave-height">-- m</div>
+        </div>
+        <div class="card">
+            <div class="title">Wind Speed</div>
+            <div class="value" id="wind-speed">-- km/h</div>
+        </div>
+    </div>
+
+    <div class="time" id="time-stamp">Fetching open-source ocean data...</div>
 </div>
 
+<script src="app.js"></script>
 </body>
 </html>
