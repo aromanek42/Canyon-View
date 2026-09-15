@@ -1,47 +1,27 @@
-// FIXED: Changed from 'https://weather.gov' to the exact API endpoint URL
-const apiZoneUrl = 'https://weather.gov';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hudson Canyon 1000 FM Marine Forecast</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .dashboard-card { background: white; width: 100%; max-width: 700px; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 6px solid #00447c; }
+        h1 { color: #00447c; font-size: 22px; margin-top: 0; }
+        p { color: #555; font-size: 14px; margin-bottom: 20px; }
+        /* Style the embedded frame to blend in smoothly */
+        .noaa-frame { width: 100%; height: 650px; border: 1px solid #ddd; border-radius: 6px; background: white; }
+    </style>
+</head>
+<body>
 
-async function fetchMarineWeather() {
-    try {
-        const response = await fetch(apiZoneUrl, {
-            method: 'GET',
-            headers: {
-                // NOAA requires a unique User-Agent identifier to grant access to the API
-                'User-Agent': 'MyHudsonCanyonDashboard (contact: yourname@example.com)'
-            }
-        });
+<div class="dashboard-card">
+    <h1>Hudson Canyon to Baltimore Canyon (ANZ820)</h1>
+    <p>Live, real-time offshore marine conditions directly from the National Weather Service.</p>
+    
+    <!-- This official NOAA target allows external embedding without throwing errors -->
+    <iframe class="noaa-frame" src="https://weather.gov"></iframe>
+</div>
 
-        if (!response.ok) {
-            throw new Error(`NWS API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        // Extract properties from the JSON-LD response
-        const periods = data.properties.periods;
-        const updatedTime = new Date(data.properties.updated).toLocaleString();
-        
-        // Format the structured text nicely
-        let cleanForecastHTML = '';
-        periods.forEach(period => {
-            cleanForecastHTML += `<strong>${period.name}:</strong><br>${period.detailedForecast}<br><br>`;
-        });
-
-        // Update your HTML elements
-        document.getElementById('forecast-data').innerHTML = cleanForecastHTML;
-        document.getElementById('update-time').textContent = `NOAA Data Updated: ${updatedTime}`;
-
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        document.getElementById('forecast-data').innerHTML = 
-            `<strong>Failed to load live conditions.</strong><br>` +
-            `<em>Reason: ${error.message}</em><br><br>` +
-            `Try viewing the data directly via the <a href="https://weather.gov" target="_blank">NWS Zone Page</a>.`;
-    }
-}
-
-// Initial fetch on browser load
-fetchMarineWeather();
-
-// Automatically update every 30 minutes
-setInterval(fetchMarineWeather, 1800000);
+</body>
+</html>
